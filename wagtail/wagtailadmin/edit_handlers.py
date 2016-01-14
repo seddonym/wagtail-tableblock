@@ -4,6 +4,7 @@ import copy
 
 from modelcluster.forms import ClusterForm, ClusterFormMetaclass
 
+import django
 from django.db import models
 from django.template.loader import render_to_string
 from django.utils.safestring import mark_safe
@@ -19,7 +20,6 @@ from taggit.managers import TaggableManager
 from wagtail.wagtailadmin import widgets
 from wagtail.wagtailcore.models import Page
 from wagtail.wagtailcore.utils import camelcase_to_underscore, resolve_model_string
-from wagtail.utils.compat import get_related_model, get_related_parent_model
 
 
 # Form field properties to override whenever we encounter a model field
@@ -525,7 +525,7 @@ class BaseChooserPanel(BaseFieldPanel):
 
     def get_chosen_item(self):
         field = self.instance._meta.get_field(self.field_name)
-        related_model = get_related_parent_model(field.related)
+        related_model = field.related.model
         try:
             return getattr(self.instance, self.field_name)
         except related_model.DoesNotExist:
@@ -552,7 +552,7 @@ class BasePageChooserPanel(BaseChooserPanel):
     @classmethod
     def widget_overrides(cls):
         return {cls.field_name: widgets.AdminPageChooser(
-            content_type=cls.target_content_type())}
+            content_type=cls.target_content_type(), can_choose_root=cls.can_choose_root)}
 
     @classmethod
     def target_content_type(cls):
@@ -564,11 +564,17 @@ class BasePageChooserPanel(BaseChooserPanel):
                     try:
                         target_models.append(resolve_model_string(page_type))
                     except LookupError:
-                        raise ImproperlyConfigured("{0}.page_type must be of the form 'app_label.model_name', given {1!r}".format(
-                            cls.__name__, page_type))
+                        raise ImproperlyConfigured(
+                            "{0}.page_type must be of the form 'app_label.model_name', given {1!r}".format(
+                                cls.__name__, page_type
+                            )
+                        )
                     except ValueError:
-                        raise ImproperlyConfigured("{0}.page_type refers to model {1!r} that has not been installed".format(
-                            cls.__name__, page_type))
+                        raise ImproperlyConfigured(
+                            "{0}.page_type refers to model {1!r} that has not been installed".format(
+                                cls.__name__, page_type
+                            )
+                        )
 
                 cls._target_content_type = list(ContentType.objects.get_for_models(*target_models).values())
             else:
@@ -579,7 +585,7 @@ class BasePageChooserPanel(BaseChooserPanel):
 
 
 class PageChooserPanel(object):
-    def __init__(self, field_name, page_type=None):
+    def __init__(self, field_name, page_type=None, can_choose_root=False):
         self.field_name = field_name
 
         if page_type:
@@ -590,12 +596,14 @@ class PageChooserPanel(object):
             page_type = []
 
         self.page_type = page_type
+        self.can_choose_root = can_choose_root
 
     def bind_to_model(self, model):
         return type(str('_PageChooserPanel'), (BasePageChooserPanel,), {
             'model': model,
             'field_name': self.field_name,
             'page_type': self.page_type,
+            'can_choose_root': self.can_choose_root,
         })
 
 
@@ -607,7 +615,10 @@ class BaseInlinePanel(EditHandler):
             return cls.panels
         # Failing that, get it from the model
         else:
-            return extract_panel_definitions_from_model_class(get_related_model(cls.related), exclude=[cls.related.field.name])
+            return extract_panel_definitions_from_model_class(
+                cls.related.related_model,
+                exclude=[cls.related.field.name]
+            )
 
     _child_edit_handler_class = None
 
@@ -615,7 +626,10 @@ class BaseInlinePanel(EditHandler):
     def get_child_edit_handler_class(cls):
         if cls._child_edit_handler_class is None:
             panels = cls.get_panel_definitions()
-            cls._child_edit_handler_class = MultiFieldPanel(panels, heading=cls.heading).bind_to_model(get_related_model(cls.related))
+            cls._child_edit_handler_class = MultiFieldPanel(
+                panels,
+                heading=cls.heading
+            ).bind_to_model(cls.related.related_model)
 
         return cls._child_edit_handler_class
 
@@ -693,13 +707,20 @@ class InlinePanel(object):
         self.max_num = max_num
 
     def bind_to_model(self, model):
+        if django.VERSION >= (1, 9):
+            related = getattr(model, self.relation_name).rel
+        else:
+            related = getattr(model, self.relation_name).related
+
         return type(str('_InlinePanel'), (BaseInlinePanel,), {
             'model': model,
             'relation_name': self.relation_name,
-            'related': getattr(model, self.relation_name).related,
+            'related': related,
             'panels': self.panels,
             'heading': self.label,
-            'help_text': self.help_text,  # TODO: can we pick this out of the foreign key definition as an alternative? (with a bit of help from the inlineformset object, as we do for label/heading)
+            'help_text': self.help_text,
+            # TODO: can we pick this out of the foreign key definition as an alternative?
+            # (with a bit of help from the inlineformset object, as we do for label/heading)
             'min_num': self.min_num,
             'max_num': self.max_num
         })

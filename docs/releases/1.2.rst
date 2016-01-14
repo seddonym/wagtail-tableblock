@@ -1,6 +1,6 @@
-==========================================
-Wagtail 1.2 release notes - IN DEVELOPMENT
-==========================================
+=========================
+Wagtail 1.2 release notes
+=========================
 
 .. contents::
     :local:
@@ -65,6 +65,12 @@ Browsable API
 The Wagtail API now incorporates the browsable front-end provided by Django REST Framework. Note that this must be enabled by adding ``'rest_framework'`` to your project's ``INSTALLED_APPS`` setting.
 
 
+Python 3.5 support
+~~~~~~~~~~~~~~~~~~
+
+Wagtail now supports Python 3.5 when run in conjunction with Django 1.8.6 or later.
+
+
 Minor features
 ~~~~~~~~~~~~~~
 
@@ -85,6 +91,8 @@ Minor features
  * Explorer navigation menu on a completely empty page tree now takes you to the root level, rather than doing nothing
  * Added animation and fixed display issues when focusing a rich text field (Alex Gleason)
  * Added a system check to warn if Pillow is compiled without JPEG / PNG support
+ * Page chooser now prevents users from selecting the root node where this would be invalid
+ * New translations for Dutch (Netherlands), Georgian, Swedish and Turkish (Turkey)
 
 Bug fixes
 ~~~~~~~~~
@@ -104,6 +112,9 @@ Bug fixes
  * Non-ASCII email addresses no longer throw errors when generating Gravatar URLs (Denis Voskvitsov, Kyle Stratis)
  * Dropdown for ``ForeignKey`` s are now styled consistently (Ashia Zawaduk)
  * Date choosers now appear on top of StreamField menus (Sergey Nikitin)
+ * Fixed a migration error that was raised when block-updating from 0.8 to 1.1+
+ * :meth:`Page.copy() <wagtail.wagtailcore.models.Page.copy>` no longer breaks on models with a ``ClusterTaggableManager`` or ``ManyToManyField``
+ * Validation errors when inserting an embed into a rich text area are now reported back to the editor
 
 Upgrade considerations
 ======================
@@ -169,3 +180,13 @@ Wagtail API requires adding ``rest_framework`` to INSTALLED_APPS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you have the Wagtail API (``wagtail.contrib.wagtailapi``) enabled, you must now add ``'rest_framework'`` to your project's ``INSTALLED_APPS`` setting. In the current version the API will continue to function without this app, but the browsable front-end will not be available; this ability will be dropped in a future release.
+
+
+:meth:`Page.get_latest_revision_as_page() <wagtail.wagtailcore.models.Page.get_latest_revision_as_page>` now returns live page object when there are no draft changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you have any application code that makes direct updates to page data, at the model or database level, be aware that the way these edits are reflected in the page editor has changed.
+
+Previously, the ``get_latest_revision_as_page`` method - used by the page editor to return the current page revision for editing - always retrieved data from the page's revision history. Now, it will only do so if the page has unpublished changes (i.e. the page is in ``live + draft`` state) - pages which have received no draft edits since being published will return the page's live data instead.
+
+As a result, any changes made directly to a live page object will be immediately reflected in the editor without needing to update the latest revision record (but note, the old behaviour is still used for pages in ``live + draft`` state).

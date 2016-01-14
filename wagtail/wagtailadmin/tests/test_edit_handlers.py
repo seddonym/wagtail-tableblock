@@ -19,7 +19,9 @@ from wagtail.wagtailadmin.widgets import AdminPageChooser, AdminDateInput, Admin
 from wagtail.wagtailimages.edit_handlers import ImageChooserPanel
 from wagtail.wagtailcore.models import Page, Site
 from wagtail.wagtailcore.fields import RichTextArea
-from wagtail.tests.testapp.models import PageChooserModel, EventPageChooserModel, EventPage, EventPageSpeaker, SimplePage
+from wagtail.tests.testapp.models import (
+    PageChooserModel, EventPageChooserModel, EventPage, EventPageSpeaker, SimplePage
+)
 from wagtail.tests.utils import WagtailTestUtils
 
 
@@ -56,7 +58,6 @@ class TestGetFormForModel(TestCase):
         EventPageForm = get_form_for_model(EventPage)
         event_form = EventPageForm()
         self.assertEqual(type(event_form.fields['body'].widget), RichTextArea)
-
 
     def test_get_form_for_model_with_specific_fields(self):
         EventPageForm = get_form_for_model(EventPage, fields=['date_from'], formsets=['speakers'])
@@ -262,7 +263,7 @@ class TestFieldPanel(TestCase):
     def setUp(self):
         self.EventPageForm = get_form_for_model(EventPage, formsets=[])
         self.event = EventPage(title='Abergavenny sheepdog trials',
-            date_from=date(2014, 7, 20), date_to=date(2014, 7, 21))
+                               date_from=date(2014, 7, 20), date_to=date(2014, 7, 21))
 
         self.EndDatePanel = FieldPanel('date_to', classname='full-width').bind_to_model(EventPage)
 
@@ -365,9 +366,23 @@ class TestPageChooserPanel(TestCase):
 
     def test_render_js_init(self):
         result = self.page_chooser_panel.render_as_field()
-        expected_js = 'createPageChooser("{id}", ["{model}"], {parent});'.format(
+        expected_js = 'createPageChooser("{id}", ["{model}"], {parent}, false);'.format(
             id="id_page", model="wagtailcore.page", parent=self.events_index_page.id)
 
+        self.assertIn(expected_js, result)
+
+    def test_render_js_init_with_can_choose_root_true(self):
+        # construct an alternative page chooser panel object, with can_choose_root=True
+        MyPageChooserPanel = PageChooserPanel('page', can_choose_root=True).bind_to_model(PageChooserModel)
+        PageChooserForm = MyPageChooserPanel.get_form_class(PageChooserModel)
+
+        form = PageChooserForm(instance=self.test_instance)
+        page_chooser_panel = MyPageChooserPanel(instance=self.test_instance, form=form)
+        result = page_chooser_panel.render_as_field()
+
+        # the canChooseRoot flag on createPageChooser should now be true
+        expected_js = 'createPageChooser("{id}", ["{model}"], {parent}, true);'.format(
+            id="id_page", model="wagtailcore.page", parent=self.events_index_page.id)
         self.assertIn(expected_js, result)
 
     def test_get_chosen_item(self):
@@ -379,7 +394,8 @@ class TestPageChooserPanel(TestCase):
         self.assertIn('<p class="help">help text</p>', result)
         self.assertIn('<span class="title">Christmas</span>', result)
         self.assertIn(
-            '<a href="/admin/pages/%d/edit/" class="edit-link button button-small button-secondary" target="_blank">Edit this page</a>' % self.christmas_page.id,
+            '<a href="/admin/pages/%d/edit/" class="edit-link button button-small button-secondary" target="_blank">'
+            'Edit this page</a>' % self.christmas_page.id,
             result)
 
     def test_render_as_empty_field(self):
@@ -408,7 +424,7 @@ class TestPageChooserPanel(TestCase):
         page_chooser_panel = self.MyPageChooserPanel(instance=self.test_instance, form=form)
 
         result = page_chooser_panel.render_as_field()
-        expected_js = 'createPageChooser("{id}", ["{model}"], {parent});'.format(
+        expected_js = 'createPageChooser("{id}", ["{model}"], {parent}, false);'.format(
             id="id_page", model="tests.eventpage", parent=self.events_index_page.id)
 
         self.assertIn(expected_js, result)
@@ -422,7 +438,7 @@ class TestPageChooserPanel(TestCase):
         page_chooser_panel = self.MyPageChooserPanel(instance=self.test_instance, form=form)
 
         result = page_chooser_panel.render_as_field()
-        expected_js = 'createPageChooser("{id}", ["{model}"], {parent});'.format(
+        expected_js = 'createPageChooser("{id}", ["{model}"], {parent}, false);'.format(
             id="id_page", model="tests.eventpage", parent=self.events_index_page.id)
 
         self.assertIn(expected_js, result)

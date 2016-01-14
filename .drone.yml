@@ -1,0 +1,15 @@
+# The scripts for building the base images can be found in scripts/drone-images
+
+build:
+  flake8:
+    image: wagtail-flake8
+    commands:
+      - flake8 wagtail
+  jscs:
+    image: wagtail-jscs
+    commands:
+      - jscs ./wagtail
+  scss-lint:
+    image: wagtail-scss-lint
+    commands:
+      - scss-lint

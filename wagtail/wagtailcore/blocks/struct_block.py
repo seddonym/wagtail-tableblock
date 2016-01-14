@@ -31,7 +31,8 @@ class BaseStructBlock(Block):
 
         super(BaseStructBlock, self).__init__(**kwargs)
 
-        self.child_blocks = self.base_blocks.copy()  # create a local (shallow) copy of base_blocks so that it can be supplemented by local_blocks
+        # create a local (shallow) copy of base_blocks so that it can be supplemented by local_blocks
+        self.child_blocks = self.base_blocks.copy()
         if local_blocks:
             for name, block in local_blocks:
                 block.set_name(name)
@@ -78,7 +79,7 @@ class BaseStructBlock(Block):
             (
                 name,
                 block.bind(value.get(name, block.get_default()),
-                    prefix="%s-%s" % (prefix, name), errors=error_dict.get(name))
+                           prefix="%s-%s" % (prefix, name), errors=error_dict.get(name))
             )
             for name, block in self.child_blocks.items()
         ])
@@ -159,11 +160,6 @@ class BaseStructBlock(Block):
             errors.extend(child_block._check_name(**kwargs))
 
         return errors
-
-    def render(self, value):
-        value = collections.OrderedDict(
-            (key, value.get(key)) for key in self.child_blocks.keys())
-        return super(BaseStructBlock, self).render(value)
 
 
 class StructBlock(six.with_metaclass(DeclarativeSubBlocksMetaclass, BaseStructBlock)):

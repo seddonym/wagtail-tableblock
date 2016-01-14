@@ -12,6 +12,7 @@ import django.utils.six.moves.urllib.request
 from django import template
 from django.test import TestCase
 from django.core.exceptions import ValidationError
+from django.core.urlresolvers import reverse
 from django.utils.six.moves.urllib.error import URLError
 
 from wagtail.wagtailcore import blocks
@@ -112,7 +113,28 @@ class TestChooser(TestCase, WagtailTestUtils):
         r = self.client.get('/admin/embeds/chooser/')
         self.assertEqual(r.status_code, 200)
 
-        # TODO: Test submitting
+    @patch('wagtail.wagtailembeds.embeds.get_embed')
+    def test_submit_valid_embed(self, get_embed):
+        get_embed.return_value = Embed(html='<img src="http://www.example.com" />', title="An example embed")
+
+        response = self.client.post(reverse('wagtailembeds:chooser_upload'), {
+            'url': 'http://www.example.com/'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, """modal.respond('embedChosen'""")
+        self.assertContains(response, """An example embed""")
+
+    @patch('wagtail.wagtailembeds.embeds.get_embed')
+    def test_submit_unrecognised_embed(self, get_embed):
+        get_embed.side_effect = EmbedNotFoundException
+
+        response = self.client.post(reverse('wagtailembeds:chooser_upload'), {
+            'url': 'http://www.example.com/'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, """modal.respond('embedChosen'""")
+        self.assertContains(response, """Cannot find an embed for this URL.""")
+
 
 class TestEmbedly(TestCase):
     @unittest.skipIf(no_embedly, "Embedly is not installed")
@@ -458,7 +480,13 @@ class TestMediaEmbedHandler(TestCase):
             {'url': 'http://www.youtube.com/watch/'},
             True
         )
-        self.assertIn('<div class="embed-placeholder" contenteditable="false" data-embedtype="media" data-url="http://www.youtube.com/watch/">', result)
+        self.assertIn(
+            (
+                '<div class="embed-placeholder" contenteditable="false" data-embedtype="media"'
+                ' data-url="http://www.youtube.com/watch/">'
+            ),
+            result
+        )
         self.assertIn('<h3>test title</h3>', result)
         self.assertIn('<p>URL: http://www.youtube.com/watch/</p>', result)
         self.assertIn('<p>Provider: test provider name</p>', result)

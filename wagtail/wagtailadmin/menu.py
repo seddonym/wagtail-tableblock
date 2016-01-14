@@ -2,13 +2,11 @@ from __future__ import unicode_literals
 
 from django.forms import MediaDefiningClass, Media
 from django.forms.utils import flatatt
+from django.template.loader import render_to_string
 from django.utils.text import slugify
 from django.utils.safestring import mark_safe
-from django.utils.six import text_type
+from django.utils.six import text_type, with_metaclass
 
-from django.utils.six import with_metaclass
-
-from wagtail.utils.compat import render_to_string
 from wagtail.wagtailcore import hooks
 
 
@@ -35,7 +33,7 @@ class MenuItem(with_metaclass(MediaDefiningClass)):
         return True
 
     def is_active(self, request):
-        return request.path.startswith(self.url)
+        return request.path.startswith(text_type(self.url))
 
     def render_html(self, request):
         return render_to_string(self.template, {
